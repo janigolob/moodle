@@ -26,11 +26,13 @@
 
 require_once(dirname(dirname(__FILE__)) . '/config.php');
 require_once($CFG->libdir . '/badgeslib.php');
+require_once($CFG->dirroot . '/badges/renderer.php');
 
 $page        = optional_param('page', 0, PARAM_INT);
 $search      = optional_param('search', '', PARAM_CLEAN);
 $clearsearch = optional_param('clearsearch', '', PARAM_TEXT);
 $download    = optional_param('download', 0, PARAM_INT);
+$certificate = optional_param('certificate', 0, PARAM_INT);
 $hash        = optional_param('hash', '', PARAM_ALPHANUM);
 $downloadall = optional_param('downloadall', false, PARAM_BOOL);
 $hide        = optional_param('hide', 0, PARAM_INT);
@@ -77,6 +79,9 @@ if ($hide) {
     header('Content-Disposition: attachment; filename="'. $name .'"');
     readfile($file);
     ob_flush();
+} else if ($certificate && $hash) {
+    $ibadge = new issued_badge($hash);
+    $ibadge->generate_badge_certificate();
 } else if ($downloadall) {
     require_sesskey();
     ob_start();

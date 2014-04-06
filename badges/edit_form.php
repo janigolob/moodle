@@ -57,6 +57,22 @@ class edit_details_form extends moodleform {
         $mform->setType('description', PARAM_CLEANHTML);
         $mform->addRule('description', null, 'required');
 
+        if (isset($badge->courseid)) {
+            $certoptions = get_available_certificates($badge->courseid);
+        } else {
+            $certoptions = array();
+        }
+        $certcount = count($certoptions);
+        if ($certcount > 0) {
+            $mform->addElement('select', 'certid', get_string('certificate', 'badges'), $certoptions);
+            $mform->setType('certid', PARAM_INT);
+            $mform->setDefault('certid', 0);
+        } else {
+            $mform->addElement('hidden', 'certid', 0);
+            $mform->setType('certid', PARAM_INT);
+        }
+
+
         $str = $action == 'new' ? get_string('badgeimage', 'badges') : get_string('newimage', 'badges');
         $imageoptions = array('maxbytes' => 262144, 'accepted_types' => array('web_image'));
         $mform->addElement('filepicker', 'image', $str, null, $imageoptions);

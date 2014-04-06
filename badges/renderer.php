@@ -34,7 +34,7 @@ class core_badges_renderer extends plugin_renderer_base {
 
     // Outputs badges list.
     public function print_badges_list($badges, $userid, $profile = false, $external = false) {
-        global $USER, $CFG;
+        global $USER, $CFG, $DB;
         foreach ($badges as $badge) {
             if (!$external) {
                 $context = ($badge->type == BADGE_TYPE_SITE) ? context_system::instance() : context_course::instance($badge->courseid);
@@ -56,7 +56,7 @@ class core_badges_renderer extends plugin_renderer_base {
                 $name .= '(' . get_string('expired', 'badges') . ')';
             }
 
-            $download = $status = $push = '';
+            $download = $certificate = $status = $push = '';
             if (($userid == $USER->id) && !$profile) {
                 $url = new moodle_url('mybadges.php', array('download' => $badge->id, 'hash' => $badge->uniquehash, 'sesskey' => sesskey()));
                 $notexpiredbadge = (empty($badge->dateexpire) || $badge->dateexpire > time());
@@ -68,6 +68,12 @@ class core_badges_renderer extends plugin_renderer_base {
                 }
 
                 $download = $this->output->action_icon($url, new pix_icon('t/download', get_string('download')));
+
+                if ($badge->certid) {
+                    $url = new moodle_url('mybadges.php', array('certificate' => $badge->id, 'hash' => $badge->uniquehash, 'sesskey' => sesskey()));
+                    $certificate = $this->output->action_icon($url, new pix_icon('t/print', get_string('downloadcertificate', 'badges')));
+                }
+
                 if ($badge->visible) {
                     $url = new moodle_url('mybadges.php', array('hide' => $badge->issuedid, 'sesskey' => sesskey()));
                     $status = $this->output->action_icon($url, new pix_icon('t/hide', get_string('makeprivate', 'badges')));
@@ -87,7 +93,7 @@ class core_badges_renderer extends plugin_renderer_base {
                     $url = new moodle_url('/badges/external.php', array('hash' => $hash, 'user' => $userid));
                 }
             }
-            $actions = html_writer::tag('div', $push . $download . $status, array('class' => 'badge-actions'));
+            $actions = html_writer::tag('div', $push . $download . $certificate . $status, array('class' => 'badge-actions'));
             $items[] = html_writer::link($url, $image . $actions . $name, array('title' => $bname));
         }
 
@@ -297,6 +303,12 @@ class core_badges_renderer extends plugin_renderer_base {
                         new moodle_url('/badges/badge.php', array('hash' => $issued['uid'], 'bake' => true)),
                         get_string('download'),
                         'POST'));
+            if ($ibadge->certid) {
+                $imagetable->data[] = array($this->output->single_button(
+                            new moodle_url('/badges/badge.php', array('hash' => $issued['uid'], 'cert' => true)),
+                            get_string('downloadcertificate', 'badges'),
+                            'POST'));
+            }
             $expiration = isset($issued['expires']) ? $issued['expires'] : $now + 86400;
             if (!empty($CFG->badges_allowexternalbackpack) && ($expiration > $now) && badges_user_has_backpack($USER->id)) {
                 $assertion = new moodle_url('/badges/assertion.php', array('b' => $issued['uid']));
@@ -828,6 +840,278 @@ class core_badges_renderer extends plugin_renderer_base {
     }
 
     ////////////////////////////////////////////////////////////////////////////
+    // Badge certificate methods
+    ////////////////////////////////////////////////////////////////////////////
+
+    // Prints a badge certificate overview infomation.
+    public function print_badgecert_overview($cert, $context) {
+        $display = "";
+
+        // Badge certificate details.
+        $display .= html_writer::start_tag('fieldset', array('class' => 'generalbox'));
+        $display .= html_writer::tag('legend', get_string('badgecertificatedetails', 'badges'), array('class' => 'bold'));
+
+        $detailstable = new html_table();
+        $detailstable->attributes = array('class' => 'clearfix', 'id' => 'badgedetails');
+        $detailstable->data[] = array(get_string('name') . ":", $cert->name);
+        $detailstable->data[] = array(get_string('description', 'badges') . ":", $cert->description);
+        $detailstable->data[] = array(get_string('createdon', 'search') . ":", userdate($cert->timecreated));
+        $display .= html_writer::table($detailstable);
+        $display .= html_writer::end_tag('fieldset');
+
+        // Issuer details.
+        $display .= html_writer::start_tag('fieldset', array('class' => 'generalbox'));
+        $display .= html_writer::tag('legend', get_string('issuerdetails', 'badges'), array('class' => 'bold'));
+
+        $issuertable = new html_table();
+        $issuertable->attributes = array('class' => 'clearfix', 'id' => 'badgeissuer');
+        $issuertable->data[] = array(get_string('issuername', 'badges') . ":", $cert->issuername);
+        $issuertable->data[] = array(get_string('contact', 'badges') . ":",
+                html_writer::tag('a', $cert->issuercontact, array('href' => 'mailto:' . $cert->issuercontact)));
+        $display .= html_writer::table($issuertable);
+        $display .= html_writer::end_tag('fieldset');
+
+        return $display;
+    }
+
+    // Prints action icons for the badge certificate.
+    public function print_cert_table_actions($cert, $context) {
+        $actions = "";
+
+        if (has_capability('moodle/badges:configurecertificate', $context) && $cert->has_elements()) {
+            // Activate/deactivate badge certificate.
+            if ($cert->status == CERT_STATUS_INACTIVE || $cert->status == CERT_STATUS_INACTIVE_LOCKED) {
+                // "Activate" will go to another page and ask for confirmation.
+                $url = new moodle_url('/badges/certificates/action.php');
+                $url->param('id', $cert->id);
+                $url->param('activate', true);
+                $url->param('sesskey', sesskey());
+                $return = new moodle_url(qualified_me());
+                $url->param('return', $return->out_as_local_url(false));
+                $actions .= $this->output->action_icon($url, new pix_icon('t/show', get_string('activate', 'badges'))) . " ";
+            } else {
+                $url = new moodle_url(qualified_me());
+                $url->param('lock', $cert->id);
+                $url->param('sesskey', sesskey());
+                $actions .= $this->output->action_icon($url, new pix_icon('t/hide', get_string('deactivate', 'badges'))) . " ";
+            }
+        }
+
+        // Preview badge certificate.
+        if (has_capability('moodle/badges:configurecertificate', $context)) {
+            $url = new moodle_url('/badges/certificates/action.php', array('preview' => '1', 'id' => $cert->id, 'sesskey' => sesskey()));
+            $actions .= $this->output->action_icon($url, new pix_icon('t/preview', get_string('preview'))) . " ";
+        }
+
+        // Edit badge certificate.
+        if (has_capability('moodle/badges:configurecertificate', $context)) {
+            $url = new moodle_url('/badges/certificates/edit.php', array('id' => $cert->id));
+            $actions .= $this->output->action_icon($url, new pix_icon('t/edit', get_string('edit'))) . " ";
+        }
+
+        // Duplicate badge certificate.
+        if (has_capability('moodle/badges:createcertificate', $context)) {
+            $url = new moodle_url('/badges/certificates/action.php', array('copy' => '1', 'id' => $cert->id, 'sesskey' => sesskey()));
+            $actions .= $this->output->action_icon($url, new pix_icon('t/copy', get_string('copy'))) . " ";
+        }
+
+        // Delete badge certificate.
+        if (has_capability('moodle/badges:deletecertificate', $context)) {
+            $url = new moodle_url(qualified_me());
+            $url->param('delete', $cert->id);
+            $actions .= $this->output->action_icon($url, new pix_icon('t/delete', get_string('delete'))) . " ";
+        }
+
+        return $actions;
+    }
+
+   // Outputs table of badge certificates with actions available.
+    protected function render_cert_management(cert_management $certs) {
+        $paging = new paging_bar($certs->totalcount, $certs->page, $certs->perpage, $this->page->url, 'page');
+
+        // New badge certificate button.
+        $htmlnew = '';
+        if (has_capability('moodle/badges:createcertificate', $this->page->context)) {
+            $n['type'] = $this->page->url->get_param('type');
+            $n['id'] = $this->page->url->get_param('id');
+            $htmlnew = $this->output->single_button(new moodle_url('new.php', $n), get_string('newbadgecertificate', 'badges'));
+        }
+
+        $htmlpagingbar = $this->render($paging);
+        $table = new html_table();
+        $table->attributes['class'] = 'collection';
+
+        $sortbyname = $this->helper_sortable_heading(get_string('name'),
+                'name', $certs->sort, $certs->dir);
+        $sortbyissuer = $this->helper_sortable_heading(get_string('issuername', 'badges'),
+                'issuer', $certs->sort, $certs->dir);
+        $sortbystatus = $this->helper_sortable_heading(get_string('status', 'badges'),
+                'status', $certs->sort, $certs->dir);
+        $table->head = array(
+                $sortbyname,
+                $sortbyissuer,
+                $sortbystatus,
+                get_string('actions')
+            );
+        $table->colclasses = array('name', 'status', 'criteria', 'actions');
+
+        foreach ($certs->certs as $c) {
+            $style = !$c->is_active() ? array('class' => 'dimmed') : array();
+            $name = html_writer::link(new moodle_url('/badges/certificates/overview.php', array('id' => $c->id)), $c->name, $style);
+            $issuer = $c->issuername;
+            $status = $c->statstring;
+
+            $actions = self::print_cert_table_actions($c, $this->page->context);
+
+            $row = array($name, $issuer, $status, $actions);
+            $table->data[] = $row;
+        }
+        $htmltable = html_writer::table($table);
+
+        return $htmlnew . $htmlpagingbar . $htmltable . $htmlpagingbar;
+    }
+
+    // Prints action icons for the badge certificate.
+    public function print_cert_elms_table_actions($element, $context) {
+        $actions = "";
+
+        // Edit badge certificate element.
+        if (has_capability('moodle/badges:configurecertificate', $context)) {
+            $url = new moodle_url('/badges/certificates/editelement.php', array('id' => $element->id));
+            $actions .= $this->output->action_icon($url, new pix_icon('t/edit', get_string('edit'))) . " ";
+        }
+
+        // Delete badge certificate element.
+        if (has_capability('moodle/badges:deletecertificate', $context)) {
+            $url = new moodle_url(qualified_me());
+            $url->param('delete', $element->id);
+            $actions .= $this->output->action_icon($url, new pix_icon('t/delete', get_string('delete'))) . " ";
+        }
+
+        return $actions;
+    }
+
+   // Outputs table of badge certificate elements with actions available.
+    protected function render_cert_element_management(cert_element_management $elements) {
+        $paging = new paging_bar($elements->totalcount, $elements->page, $elements->perpage, $this->page->url, 'page');
+
+        // New badge certificate element button.
+        $htmlnew = '';
+        if (has_capability('moodle/badges:createcertificate', $this->page->context)) {
+            $n['type'] = $this->page->url->get_param('type');
+            $n['id'] = $this->page->url->get_param('id');
+            $htmlnew = $this->output->single_button(new moodle_url('newelement.php', $n), get_string('newelement', 'badges'));
+        }
+
+        // Badge certificate preview button.
+        if (has_capability('moodle/badges:createcertificate', $this->page->context)) {
+            $n['preview'] = 1;
+            $n['id'] = $this->page->url->get_param('id');
+            $htmlpreview = $this->output->single_button(new moodle_url('action.php', $n), get_string('badgecertificatepreview', 'badges'));
+        }
+
+        $htmlpagingbar = $this->render($paging);
+        $table = new html_table();
+        $table->attributes['class'] = 'collection';
+
+        $table->head = array(
+                get_string('elementcontent', 'badges'),
+                get_string('elementposition', 'badges'),
+                get_string('elementsize', 'badges'),
+                get_string('elementfamily', 'badges'),
+                get_string('actions')
+            );
+        $table->colclasses = array('content', 'position', 'actions');
+
+        foreach ($elements->elements as $e) {
+            $content = $e->rawtext;
+            $position = '(' . $e->x . ', ' . $e->y . ')';
+            $size = $e->size;
+            $family = get_string('elementfamily:'.$e->family, 'badges');
+
+            $actions = self::print_cert_elms_table_actions($e, $this->page->context);
+
+            $row = array($content, $position, $size, $family, $actions);
+            $table->data[] = $row;
+        }
+        $htmltable = html_writer::table($table);
+
+        return $htmlnew . $htmlpagingbar . $htmltable . $htmlpagingbar . $htmlpreview;
+    }
+
+    // Prints tabs for badge certificate editing.
+    public function print_badgecert_tabs($certid, $context, $current = 'overview') {
+        global $DB;
+
+        $row = array();
+
+        $row[] = new tabobject('overview',
+                    new moodle_url('/badges/certificates/overview.php', array('id' => $certid)),
+                    get_string('boverview', 'badges')
+                );
+
+        if (has_capability('moodle/badges:configurecertificate', $context)) {
+            $row[] = new tabobject('details',
+                        new moodle_url('/badges/certificates/edit.php', array('id' => $certid)),
+                        get_string('bdetails', 'badges')
+                    );
+        }
+
+        if (has_capability('moodle/badges:configureelements', $context)) {
+            $row[] = new tabobject('elements',
+                        new moodle_url('/badges/certificates/elements.php', array('id' => $certid)),
+                        get_string('belements', 'badges')
+                    );
+        }
+
+        echo $this->tabtree($row, $current);
+    }
+
+    /**
+     * Prints badge certificate status box.
+     * @return Either the status box html as a string or null
+     */
+    public function print_badgecert_status_box(badge_certificate $cert) {
+        if (has_capability('moodle/badges:configurecertificate', $cert->get_context())) {
+            $table = new html_table();
+            $table->attributes['class'] = 'boxaligncenter statustable';
+
+            if (!$cert->has_elements()) {
+                $elementsurl = new moodle_url('/badges/certificates/elements.php', array('id' => $cert->id));
+                $status = get_string('noelements', 'badges');
+                if ($this->page->url != $elementsurl) {
+                    $action = $this->output->single_button(
+                        $elementsurl,
+                        get_string('addelement', 'badges'), 'POST', array('class' => 'activatebadge'));
+                } else {
+                    $action = '';
+                }
+                $row = array($status, $action);
+            } else {
+                $status = get_string('statuscertmessage_' . $cert->status, 'badges');
+                if ($cert->is_active()) {
+                    $action = $this->output->single_button(new moodle_url('/badges/certificates/action.php',
+                                array('id' => $cert->id, 'lock' => 1, 'sesskey' => sesskey(),
+                                      'return' => $this->page->url->out_as_local_url(false))),
+                            get_string('deactivate', 'badges'), 'POST', array('class' => 'activatebadge'));
+                } else {
+                    $action = $this->output->single_button(new moodle_url('/badges/certificates/action.php',
+                                array('id' => $cert->id, 'activate' => 1, 'sesskey' => sesskey(),
+                                      'return' => $this->page->url->out_as_local_url(false))),
+                            get_string('activate', 'badges'), 'POST', array('class' => 'activatebadge'));
+                }
+                $row = array($status . $this->output->help_icon('status', 'badges'), $action);
+            }
+            $table->data[] = $row;
+
+            $style = $cert->is_active() ? 'generalbox statusbox active' : 'generalbox statusbox inactive';
+            return $this->output->box(html_writer::table($table), $style);
+        }
+
+        return null;
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
     // Helper methods
     // Reused from stamps collection plugin
     ////////////////////////////////////////////////////////////////////////////
@@ -905,12 +1189,16 @@ class core_badges_renderer extends plugin_renderer_base {
 
         return $out;
     }
+
 }
 
 /**
  * An issued badges for badge.php page
  */
 class issued_badge implements renderable {
+    /** @var issued badge ID */
+    public $id;
+
     /** @var issued badge */
     public $issued;
 
@@ -926,6 +1214,9 @@ class issued_badge implements renderable {
     /** @var badge class */
     public $badgeid = 0;
 
+    /** @var badge certificate class */
+    public $certid = 0;
+
     /**
      * Initializes the badge to display
      *
@@ -938,7 +1229,7 @@ class issued_badge implements renderable {
         $this->issued = $assertion->get_badge_assertion();
         $this->badgeclass = $assertion->get_badge_class();
 
-        $rec = $DB->get_record_sql('SELECT userid, visible, badgeid
+        $rec = $DB->get_record_sql('SELECT id, userid, visible, badgeid
                 FROM {badge_issued}
                 WHERE ' . $DB->sql_compare_text('uniquehash', 40) . ' = ' . $DB->sql_compare_text(':hash', 40),
                 array('hash' => $hash), IGNORE_MISSING);
@@ -950,9 +1241,136 @@ class issued_badge implements renderable {
                         FROM {user} u LEFT JOIN {badge_backpack} b ON u.id = b.userid
                         WHERE u.id = :userid", array('userid' => $rec->userid));
             $this->recipient = $user;
+            $this->id = $rec->id;
             $this->visible = $rec->visible;
             $this->badgeid = $rec->badgeid;
+            // Get badge certificate for this badge from database.
+            $certid = $DB->get_field('badge', 'certid', array('id' => $rec->badgeid));
+            $this->certid = $certid;
         }
+    }
+
+    /**
+     * Generates badge certificate in PDF format.
+     */
+    public function generate_badge_certificate() {
+        global $CFG, $DB;
+        require_once(dirname(dirname(__FILE__)) . '/lib' . '/tcpdf/tcpdf.php');
+
+        $cert = new badge_certificate($this->certid);
+        $pdf = new TCPDF($cert->orientation, $cert->unit, $cert->format, true, 'UTF-8', false);
+        $pdf->SetCreator(PDF_CREATOR);
+        // remove default header/footer
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+        // set default monospaced font
+        $pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
+        // set margins
+        $pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
+        // set auto page breaks
+        $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+        // set image scale factor
+        $pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
+        // set default font subsetting mode
+        $pdf->setFontSubsetting(true);
+
+        // Add a page
+        // This method has several options, check the source code documentation for more information.
+        $pdf->AddPage();
+
+        // Add badge certificate background image
+        if ($cert->certbgimage) {
+            // get the current page break margin
+            $break_margin = $pdf->getBreakMargin();
+            // get current auto-page-break mode
+            $auto_page_break = $pdf->getAutoPageBreak();
+            // disable auto-page-break
+            $pdf->SetAutoPageBreak(false, 0);
+            // set background image
+            switch (pathinfo($cert->certbgimage, PATHINFO_EXTENSION)) {
+                case 'png':
+                    $type = 'PNG';
+                    break;
+                case 'jpg':
+                case 'jpeg':
+                    $type = 'JPEG';
+                    break;
+                default:
+                    $type = '';
+            }
+            $pdf->Image($cert->certbgimage, 0, 0, 0, 0, $type, '', '', 2, 200, '', false, false, 0);
+            // restore auto-page-break status
+            $pdf->SetAutoPageBreak($auto_page_break, $break_margin);
+            // set the starting point for the page content
+            $pdf->setPageMark();
+        }
+
+        // Print text/content using writeHTMLCell()
+        $now = time();
+        foreach ($cert->elements as $element) {
+            $placeholders = array(
+                '[[recipient-flname]]', // Adds the recipient's full name (first, last)
+                '[[recipient-lfname]]', // Adds the recipient's full name (last, first)
+                '[[recipient-email]]',  // Adds the recipient's email address
+                '[[issuer-name]]',      // Adds the issuer's name or title
+                '[[issuer-contact]]',   // Adds the issuer's contact information
+                '[[badge-name]]',       // Adds the badge's name or title
+                '[[badge-desc]]',       // Adds the badge's description
+                '[[badge-number]]',     // Adds the badge's ID number
+                '[[badge-course]]',     // Adds the name of the course where badge was awarded
+                '[[badge-hash]]',       // Adds the badge hash value
+                '[[datetime-Y]]',       // Adds the year
+                '[[datetime-d.m.Y]]',   // Adds the date in dd.mm.yyyy format
+                '[[datetime-d/m/Y]]',   // Adds the date in dd/mm/yyyy format
+                '[[datetime-F]]',       // Adds the date (used in DB datestamps)
+                '[[datetime-s]]',       // Adds Unix Epoch Time timestamp';
+            );
+            $values = array(
+                $this->recipient->firstname.' '.$this->recipient->lastname,
+                $this->recipient->lastname.' '.$this->recipient->firstname,
+                $this->recipient->backpackemail,
+                $cert->issuername,
+                $cert->issuercontact,
+                $this->badgeclass['name'],
+                $this->badgeclass['description'],
+                $this->id,
+                $DB->get_field('course', 'fullname', array('id' => $cert->courseid)),
+                sha1(rand() . $cert->usercreated . $cert->id . $now),
+                strftime('%Y', $now),
+                strftime('%d. %m. %Y', $now),
+                strftime('%d/%m/%Y', $now),
+                strftime('%F', $now),
+                strftime('%s', $now),
+            );
+            $content = str_replace($placeholders, $values, $element->rawtext);
+            $pdf->setXY(0,0);
+            $pdf->SetFont($element->family, '', $element->size, '', true); // freesans or freeserif
+            if (in_array($element->align, array('T', 'B', 'I'))) {
+                switch ($element->align) {
+                    case 'T':
+                        $angle = 270;
+                        break;
+                    case 'B':
+                        $angle = 90;
+                        break;
+                    case 'I':
+                        $angle = 180;
+                        break;
+                    default:
+                        $angle = 0;
+                }
+                $pdf->StartTransform();
+                $pdf->Rotate($angle, $element->x, $element->y);
+                $pdf->writeHTMLCell(0, 0, $element->x, $element->y, $content, 0, 1, 0, true, $element->align, true);
+                $pdf->StopTransform();
+            } else {
+                $pdf->writeHTMLCell(0, 0, $element->x, $element->y, $content, 0, 1, 0, true, $element->align, true);
+            }
+        }
+
+        // Close and output PDF document
+        // This method has several options, check the source code documentation for more information.
+        $pdf->Output($this->badgeclass['name'] . '.pdf', 'D');
     }
 }
 
@@ -1105,4 +1523,79 @@ class badge_user_collection extends badge_collection implements renderable {
             $this->backpack = get_backpack_settings($userid, true);
         }
     }
+}
+
+/**
+ * Collection of all badge certificates for view.php page
+ */
+class cert_collection implements renderable {
+
+    /** @var string how are the data sorted */
+    public $sort = 'name';
+
+    /** @var string how are the data sorted */
+    public $dir = 'ASC';
+
+    /** @var int page number to display */
+    public $page = 0;
+
+    /** @var int number of badge certificates to display per page */
+    public $perpage = CERT_PERPAGE;
+
+    /** @var int the total number of badge certificates to display */
+    public $totalcount = null;
+
+    /** @var array list of badge certificates */
+    public $certs = array();
+
+    /**
+     * Initializes the list of badge certificates to display
+     *
+     * @param array $certs Badge certificates to render
+     */
+    public function __construct($certs) {
+        $this->certs = $certs;
+    }
+}
+
+/**
+ * Collection of badge certificates used at the index.php page
+ */
+class cert_management extends cert_collection implements renderable {
+}
+
+class cert_element_collection implements renderable {
+
+    /** @var string how are the data sorted */
+    public $sort = 'id';
+
+    /** @var string how are the data sorted */
+    public $dir = 'ASC';
+
+    /** @var int page number to display */
+    public $page = 0;
+
+    /** @var int number of badge certificates to display per page */
+    public $perpage = CERT_PERPAGE;
+
+    /** @var int the total number of badge certificates to display */
+    public $totalcount = null;
+
+    /** @var array list of badge certificate elements */
+    public $elements = array();
+
+    /**
+     * Initializes the list of badge certificates to display
+     *
+     * @param array $certs Badge certificates to render
+     */
+    public function __construct($elements) {
+        $this->elements = $elements;
+    }
+}
+
+/**
+ * Collection of badge certificates used at the index.php page
+ */
+class cert_element_management extends cert_element_collection implements renderable {
 }

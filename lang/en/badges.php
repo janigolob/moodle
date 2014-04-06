@@ -23,6 +23,7 @@
  * @copyright  2012 onwards Totara Learning Solutions Ltd {@link http://www.totaralms.com/}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @author     Yuliya Bozhko <yuliya.bozhko@totaralms.com>
+ * @author     Gregor Anzelj <gregor.anzelj@gmail.com>
  */
 
 $string['actions'] = 'Actions';
@@ -33,6 +34,8 @@ $string['addcriteria'] = 'Add criteria';
 $string['addcriteriatext'] = 'To start adding criteria, please select one of the options from the drop-down menu.';
 $string['addcourse'] = 'Add courses';
 $string['addcourse_help'] = 'Select all courses that should be added to this badge requirement. Hold CTRL key to select multiple items.';
+$string['addelement'] = 'Add element';
+$string['addelementtext'] = 'To start adding elements, please select one of the options from the drop-down menu.';
 $string['addtobackpack'] = 'Add to backpack';
 $string['adminonly'] = 'This page is restricted to site administrators only.';
 $string['after'] = 'after the date of issue.';
@@ -91,10 +94,18 @@ $string['personaconnection'] = 'Sign in with your email';
 $string['personaconnection_help'] = 'Persona is a system for identifying yourself across the web, using an email address that you own. The Open Badges backpack uses Persona as a login system, so to be able to connect to a backpack you with need a Persona account.
 
 For more information about Persona visit <a href="https://login.persona.org/about">https://login.persona.org/about</a>.';
+$string['backgroundimage'] = 'Background image';
+$string['backgroundimage_help'] = 'This is an image that will be used as a background image for this badge certificate.
+
+To add a new image, browse and select an image (in JPG or PNG format) then click "Save changes".';
+
 $string['backpackimport'] = 'Badge import settings';
 $string['backpackimport_help'] = 'After backpack connection is successfully established, badges from your backpack can be displayed on your "My Badges" page and your profile page.
 
 In this area, you can select collections of badges from your backpack that you would like to display in your profile.';
+$string['badgecertificatedetails'] = 'Badge certificate details';
+$string['badgecertificateelement'] = 'Badge certificate element';
+$string['badgecertificatepreview'] = 'Badge certificate preview';
 $string['badgedetails'] = 'Badge details';
 $string['badgeimage'] = 'Image';
 $string['badgeimage_help'] = 'This is an image that will be used when this badge is issued.
@@ -118,15 +129,39 @@ $string['badgestatus_1'] = 'Available to users';
 $string['badgestatus_2'] = 'Not available to users';
 $string['badgestatus_3'] = 'Available to users';
 $string['badgestatus_4'] = 'Archived';
+$string['badgecertificatestatus_0'] = 'Not available to users';
+$string['badgecertificatestatus_1'] = 'Available to users';
+$string['badgecertificatestatus_2'] = 'Not available to users';
+$string['badgecertificatestatus_3'] = 'Available to users';
+$string['badgecertificatestatus_4'] = 'Archived';
 $string['badgestoearn'] = 'Number of badges available: {$a}';
 $string['badgesview'] = 'Course badges';
 $string['badgeurl'] = 'Issued badge link';
 $string['bawards'] = 'Recipients ({$a})';
 $string['bcriteria'] = 'Criteria';
 $string['bdetails'] = 'Edit details';
+$string['belements'] = 'Elements';
 $string['bmessage'] = 'Message';
 $string['boverview'] = 'Overview';
 $string['bydate'] = ' complete by';
+$string['certificatesavailable'] = 'Number of badge certificates available: {$a}';
+$string['certificate'] = 'Certificate';
+$string['certificateformat'] = 'Format';
+$string['certificateformat:A3'] = 'A3 (297x420 mm | 11.69x16.54 in)';
+$string['certificateformat:A4'] = 'A4 (210x297 mm | 8.27x11.69 in)';
+$string['certificateformat:B4'] = 'B4 (250x353 mm | 9.84x13.90 in)';
+$string['certificateformat:B5'] = 'B5 (176x250 mm | 6.93x9.84 in)';
+$string['certificateformat:Legal'] = 'Legal (216x356 mm | 8.50x14.00 in)';
+$string['certificateformat:Letter'] = 'Letter (216x279 mm | 8.50x11.00 in)';
+$string['certificateformat:Tabloid'] = 'Tabloid (279x432 mm | 11.00x17.00 in)';
+$string['certificateorientation'] = 'Orientation';
+$string['certificateorientation:portrait'] = 'Portrait';
+$string['certificateorientation:landscape'] = 'Landscape';
+$string['certificateunit'] = 'Unit';
+$string['certificateunit:pt'] = 'pt - point';
+$string['certificateunit:mm'] = 'mm - millimetre';
+$string['certificateunit:cm'] = 'cm - centimetre';
+$string['certificateunit:in'] = 'in - inch';
 $string['clearsettings'] = 'Clear settings';
 $string['completionnotenabled'] = 'Course completion is not enabled for this course, so it cannot be included in badge criteria. Course completion may be enabled in the course settings.';
 $string['completioninfo'] = 'This badge was issued for completing: ';
@@ -141,8 +176,13 @@ $string['copyof'] = 'Copy of {$a}';
 $string['coursebadgesdisabled'] = 'Course badges are not enabled on this site.';
 $string['coursecompletion'] = 'Users must complete this course.';
 $string['coursebadges'] = 'Badges';
+$string['coursebadgecertificates'] = 'Badge certificates';
 $string['create'] = 'New badge';
 $string['createbutton'] = 'Create badge';
+$string['createcertbutton'] = 'Create badge certificate';
+$string['createcertelmbutton'] = 'Create badge certificate element';
+$string['createcertificate'] = 'New badge certificate';
+$string['createelement'] = 'New badge certificate element';
 $string['creatorbody'] = '<p>{$a->user} has completed all badge requirements and has been awarded the badge. View issued badge at {$a->link} </p>';
 $string['creatorsubject'] = '\'{$a}\' has been awarded!';
 $string['criteriasummary'] = 'Criteria summary';
@@ -201,15 +241,38 @@ $string['defaultissuercontact_desc'] = 'An email address associated with the bad
 $string['defaultissuername'] = 'Default badge issuer name';
 $string['defaultissuername_desc'] = 'Name of the issuing agent or authority.';
 $string['delbadge'] = 'Would you like to delete badge \'{$a}\' and remove all existing issued badges?';
+$string['delbadgecertificate'] = 'Would you like to delete badge certificate \'{$a}\'?';
 $string['delconfirm'] = 'Delete and remove existing issued badges';
+$string['delconfirmcert'] = 'Delete and remove existing badge certificate';
 $string['deletehelp'] = '<p>Fully deleting a badge means that all its information and criteria records will be permanently removed. Users who have earned this badge will no longer be able to access it and display it on their profile pages.</p>
 <p>Note: Users who have earned this badge and have already pushed it to their external backpack, will still have this badge in their external backpack. However, they will not be able to access criteria and evidence pages linking back to this web site.</p>';
+$string['deletehelpcert'] = '<p>Fully deleting a badge certificate means that all its information and elements will be permanently removed. Users who have used this badge certificate will no longer be able to access it.</p>';
 $string['delcritconfirm'] = 'Are you sure that you want to delete this criterion?';
 $string['delparamconfirm'] = 'Are you sure that you want to delete this parameter?';
 $string['description'] = 'Description';
 $string['disconnect'] = 'Disconnect';
 $string['donotaward'] = 'Currently, this badge is not active, so it cannot be awarded to users. If you would like to award this badge, please set its status to active.';
+$string['downloadcertificate'] = 'Download certificate';
+$string['editelement'] = 'Edit badge certificate element';
 $string['editsettings'] = 'Edit settings';
+$string['elementalign'] = 'Align';
+$string['elementalign:L'] = 'Left';
+$string['elementalign:C'] = 'Center';
+$string['elementalign:R'] = 'Right';
+$string['elementalign:0'] = 'Left for LTR or right for RTL';
+$string['elementalign:I'] = 'Invert';
+$string['elementalign:T'] = 'Top down';
+$string['elementalign:B'] = 'Bottom up';
+$string['elementborder'] = 'Border';
+$string['elementcontent'] = 'Element content';
+$string['elementfamily'] = 'Font family';
+$string['elementfamily:freesans'] = 'Free Sans (Arial, Helvetica)';
+$string['elementfamily:freeserif'] = 'Free Serif (Times New Roman)';
+$string['elementposition'] = 'Element position (x, y)';
+$string['elementposition:x'] = 'Position x';
+$string['elementposition:y'] = 'Position y';
+$string['elementsize'] = 'Font size';
+$string['elementscontained'] = 'Number of elements contained by this badge certificate: {$a}';
 $string['enablebadges'] = 'Enable badges';
 $string['error:backpackdatainvalid'] = 'The data return from the backpack was invalid.';
 $string['error:backpackemailnotfound'] = 'The email \'{$a}\' is not associated with a backpack. You need to <a href="http://backpack.openbadges.org">create a backpack</a> for that account or sign in with another email address.';
@@ -217,11 +280,15 @@ $string['error:backpacknotavailable'] = 'Your site is not accessible from the In
 $string['error:backpackloginfailed'] = 'You could not be connected to an external backpack for the following reason: {$a}';
 $string['error:backpackproblem'] = 'There was a problem connecting to your backpack service provider. Please try again later.';
 $string['error:badjson'] = 'The connection attempt returned invalid data.';
-$string['error:cannotact'] = 'Cannot activate the badge. ';
+$string['error:cannotact'] = 'Cannot activate the badge.';
+$string['error:cannotactcert'] = 'Cannot activate the badge certificate.';
 $string['error:cannotawardbadge'] = 'Cannot award badge to a user.';
 $string['error:connectionunknownreason'] = 'The connection was unsuccessful but no reason was given.';
 $string['error:clone'] = 'Cannot clone the badge.';
+$string['error:clonecert'] = 'Cannot clone the badge certificate.';
 $string['error:duplicatename'] = 'Badge with such name already exists in the system.';
+$string['error:duplicatecertname'] = 'Badge certificate with such name already exists in the system.';
+$string['error:duplicateelement'] = 'Badge certificate element with such content already exists in the system.';
 $string['error:externalbadgedoesntexist'] = 'Badge not found';
 $string['error:guestuseraccess'] = 'You are currently using guest access. To see badges you need to log in with your user account.';
 $string['error:invalidbadgeurl'] = 'Invalid badge issuer URL format.';
@@ -235,6 +302,8 @@ $string['error:nogroups'] = '<p>There are no public collections of badges availa
 <p>Only public collections are shown, <a href="http://backpack.openbadges.org">visit your backpack</a> to create some public collections.</p>';
 $string['error:nopermissiontoview'] = 'You have no permissions to view badge recipients';
 $string['error:nosuchbadge'] = 'Badge with id {$a} does not exist.';
+$string['error:nosuchbadgecertelement'] = 'Badge certificate element with id {$a} does not exist.';
+$string['error:nosuchbadgecertificate'] = 'Badge certificate with id {$a} does not exist.';
 $string['error:nosuchcourse'] = 'Warning: This course is no longer available.';
 $string['error:nosuchfield'] = 'Warning: This user profile field is no longer available.';
 $string['error:nosuchmod'] = 'Warning: This activity is no longer available.';
@@ -246,6 +315,7 @@ $string['error:personaneedsjs'] = 'Currently, Javascript is required to connect 
 $string['error:requesttimeout'] = 'The connection request timed out before it could complete.';
 $string['error:requesterror'] = 'The connection request failed (error code {$a}).';
 $string['error:save'] = 'Cannot save the badge.';
+$string['error:savecert'] = 'Cannot save the badge certificate.';
 $string['error:userdeleted'] = '{$a->user} (This user no longer exists in {$a->site})';
 $string['evidence'] = 'Evidence';
 $string['existingrecipients'] = 'Existing badge recipients';
@@ -283,6 +353,7 @@ $string['localbadgesp'] = 'Badges from {$a}:';
 $string['makeprivate'] = 'Make private';
 $string['makepublic'] = 'Make public';
 $string['managebadges'] = 'Manage badges';
+$string['managebadgecertificates'] = 'Manage badge certificates';
 $string['message'] = 'Message body';
 $string['messagebody'] = '<p>You have been awarded the badge "%badgename%"!</p>
 <p>More information about this badge can be found at %badgelink%.</p>
@@ -295,13 +366,18 @@ $string['mybadges'] = 'My badges';
 $string['mybackpack'] = 'My backpack settings';
 $string['never'] = 'Never';
 $string['newbadge'] = 'Add a new badge';
+$string['newbadgecertificate'] = 'Add a new badge certificate';
+$string['newelement'] = 'Add a new element';
 $string['newimage'] = 'New image';
 $string['noawards'] = 'This badge has not been earned yet.';
 $string['nobackpack'] = 'There is no backpack service connected to this account.<br/>';
 $string['nobackpackbadges'] = 'There are no badges in the collections you have selected. <a href="mybackpack.php">Add more collections</a>.';
 $string['nobackpackcollections'] = 'No badge collections have been selected. <a href="mybackpack.php">Add collections</a>.';
 $string['nobadges'] = 'There are no badges available.';
+$string['nobadgecertificates'] = 'There are no badge certificates available.';
+$string['nobadgecertificateelms'] = 'This badge certificate contains no elements.';
 $string['nocriteria'] = 'Criteria for this badge have not been set up yet.';
+$string['noelements'] = 'Elements of this badge certificate have not been set up yet.';
 $string['noexpiry'] = 'This badge does not have an expiry date.';
 $string['noparamstoadd'] = 'There are no additional parameters available to add to this badge requirement.';
 $string['notacceptedrole'] = 'Your current role assignment is not among the roles that can manually issue this badge.<br/>
@@ -328,8 +404,36 @@ $string['notifymonthly'] = 'Monthly';
 $string['notifyweekly'] = 'Weekly';
 $string['numawards'] = 'This badge has been issued to <a href="{$a->link}">{$a->count}</a> user(s).';
 $string['numawardstat'] = 'This badge has been issued {$a} user(s).';
+$string['officialtype'] = 'Type';
+$string['officialtypedesc'] = 'Choose if this is "official" badge certificate which can be assigned only by admins and managers.';
 $string['overallcrit'] = 'of the selected criteria are complete.';
 $string['potentialrecipients'] = 'Potential badge recipients';
+$string['preview:recipientflname'] = 'John Doe';
+$string['preview:recipientlfname'] = 'Doe John';
+$string['preview:recipientemail'] = 'john.doe@email.com';
+$string['preview:issuername'] = 'Issuer name';
+$string['preview:issuercontact'] = 'info@issuer.org';
+$string['preview:badgename'] = 'Badge name';
+$string['preview:badgedesc'] = 'This is the description of the badge.';
+$string['preview:badgecourse'] = 'Course name';
+$string['rawtext'] = 'Content';
+$string['rawtext_help'] = 'Element content can contain arbitrary text. The following (case sensitive) placeholders are available:
+
+* **[[recipient-flname]]** - Adds the recipient\'s full name (first, last)
+* **[[recipient-lfname]]** - Adds the recipient\'s full name (last, first)
+* **[[recipient-email]]** - Adds the recipient\'s email address
+* **[[issuer-name]]** - Adds the issuer\'s name or title
+* **[[issuer-contact]]** - Adds the issuer\'s contact information
+* **[[badge-name]]** - Adds the badge\'s name or title
+* **[[badge-desc]]** - Adds the badge\'s description
+* **[[badge-number]]** - Adds the badge\'s ID number
+* **[[badge-course]]** - Adds the name of the course where badge was awarded
+* **[[badge-hash]]** - Adds the badge hash value
+* **[[datetime-Y]]** - Adds the year
+* **[[datetime-d.m.Y]]** - Adds the date in dd.mm.yyyy format
+* **[[datetime-d/m/Y]]** - Adds the date in dd/mm/yyyy format
+* **[[datetime-F]]** - Adds the date (used in DB datestamps)
+* **[[datetime-s]]** - Adds Unix Epoch Time timestamp';
 $string['recipients'] = 'Badge recipients';
 $string['recipientdetails'] = 'Recipient details';
 $string['recipientidentificationproblem'] = 'Cannot find a recipient of this badge among the existing users.';
@@ -344,6 +448,12 @@ $string['reviewconfirm'] = '<p>This will make your badge visible to users and al
 <p>Once a badge has been issued it will be <strong>locked</strong> - certain settings including the criteria and expiry settings can no longer be changed.</p>
 
 <p>Are you sure you want to enable access to the badge \'{$a}\'?</p>';
+$string['reviewbadgecertificate'] = 'Changes in badge certificate access';
+$string['reviewcertconfirm'] = '<p>This will make your badge certificate accessible.</p>
+
+<p>Once a badge certificate has been used it will be <strong>locked</strong> - certain settings including the certificate elements can no longer be changed.</p>
+
+<p>Are you sure you want to enable access to the badge certificate \'{$a}\'?</p>';
 $string['save'] = 'Save';
 $string['searchname'] = 'Search by name';
 $string['selectaward'] = 'Please select the role you would like to use to award this badge: ';
@@ -356,6 +466,11 @@ $string['sitebadges'] = 'Site badges';
 $string['sitebadges_help'] = 'Site badges can only be awarded to users for site-related activities. These include completing a set of courses or parts of user profiles. Site badges can also be issued manually by one user to another.
 
 Badges for course-related activities must be created at the course level. Course badges can be found under Course Administration > Badges.';
+$string['sitebadgecertificates'] = 'Site badge certificates';
+$string['statuscertmessage_0'] = 'This badge certificate is currently not available to users. Enable access if you want users to be able to use it. ';
+$string['statuscertmessage_1'] = 'This badge certificate is currently available to users. Disable access to make any changes. ';
+$string['statuscertmessage_2'] = 'This badge certificate is currently not available to users, and its elements are locked. Enable access if you want users to be able to use it. ';
+$string['statuscertmessage_3'] = 'This badge certificate is currently available to users, and its elements are locked. ';
 $string['statusmessage_0'] = 'This badge is currently not available to users. Enable access if you want users to earn this badge. ';
 $string['statusmessage_1'] = 'This badge is currently available to users. Disable access to make any changes. ';
 $string['statusmessage_2'] = 'This badge is currently not available to users, and its criteria are locked. Enable access if you want users to earn this badge. ';

@@ -2015,6 +2015,81 @@ $capabilities = array(
         )
     ),
 
+    // View available badge certificates without using them.
+    'moodle/badges:viewcertificates' => array(
+        'captype'       => 'read',
+        'contextlevel'  => CONTEXT_COURSE,
+        'archetypes'    => array(
+            'user'          => CAP_ALLOW,
+        )
+    ),
+
+    // Create/duplicate badge certificates.
+    'moodle/badges:createcertificate' => array(
+        'riskbitmask'  => RISK_SPAM,
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => array(
+            'manager'        => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        )
+    ),
+
+    // Delete badge certificates.
+    'moodle/badges:deletecertificate' => array(
+        'riskbitmask'  => RISK_DATALOSS,
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => array(
+            'manager'        => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        )
+    ),
+
+    // Set up/edit badge certificate details.
+    'moodle/badges:configurecertificate' => array(
+        'riskbitmask'  => RISK_SPAM,
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => array(
+            'manager'        => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        )
+    ),
+
+    // Set up/edit badge certificate elements.
+    'moodle/badges:configureelements' => array(
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => array(
+            'manager'        => CAP_ALLOW,
+            'teacher'        => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        )
+    ),
+
+    // Access/use "official" badge certificates.
+    'moodle/badges:assignofficialcertificate' => array(
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => array(
+            'manager'        => CAP_ALLOW,
+        )
+    ),
+
+    // Access/use non "official" badge certificates only.
+    'moodle/badges:assigncustomcertificate' => array(
+        'captype'      => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes'   => array(
+            'teacher'        => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+        )
+    ),
+
     'moodle/site:forcelanguage' => array(
         'captype' => 'read',
         'contextlevel' => CONTEXT_SYSTEM,

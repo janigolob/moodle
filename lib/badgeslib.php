@@ -22,6 +22,7 @@
  * @copyright  2012 onwards Totara Learning Solutions Ltd {@link http://www.totaralms.com/}
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  * @author     Yuliya Bozhko <yuliya.bozhko@totaralms.com>
+ * @author     Gregor Anzelj <gregor.anzelj@gmail.com>
  */
 
 defined('MOODLE_INTERNAL') || die();
@@ -120,6 +121,7 @@ class badge {
     public $expireperiod;
     public $type;
     public $courseid;
+    public $certid;
     public $message;
     public $messagesubject;
     public $attachment;
@@ -222,6 +224,10 @@ class badge {
 
         $fordb->timemodified = time();
         if ($DB->update_record_raw('badge', $fordb)) {
+            // If this badge has badge certificate set, than lock that certificate
+            if ($fordb->certid) {
+                $DB->set_field('badge_certificate', 'status', 3, array('id' => $fordb->certid));
+            }
             return true;
         } else {
             throw new moodle_exception('error:save', 'badges');
@@ -648,13 +654,488 @@ class badge {
     }
 }
 
+/*
+ * Number of records per page.
+*/
+define('CERT_PERPAGE', 50);
+
+/*
+ * Inactive badge certificate means that this badge certificate cannot be used and
+ * has not been used yet. Its elements can be changed.
+ */
+define('CERT_STATUS_INACTIVE', 0);
+
+/*
+ * Active badge certificate means that this badge certificate can be used, but it
+ * has not been used yet. Can be deactivated for the purpose of changing its elements.
+ */
+define('CERT_STATUS_ACTIVE', 1);
+
+/*
+ * Inactive badge certificate can no longer be used, but it has been used in the past
+ * and therefore its elements cannot be changed.
+ */
+define('CERT_STATUS_INACTIVE_LOCKED', 2);
+
+/*
+ * Active badge certificate means that it can be used and has already been used by
+ * users. Its elements cannot be changed any more.
+ */
+define('CERT_STATUS_ACTIVE_LOCKED', 3);
+
+/*
+ * Badge certificate type for site badge certificates.
+ */
+define('CERT_TYPE_SITE', 1);
+
+/*
+ * Badge certificate type for course badge certificates.
+ */
+define('CERT_TYPE_COURSE', 2);
+
+/**
+ * Class that represents badge certificate.
+ *
+ */
+class badge_certificate {
+    /** @var int Certificate id */
+    public $id;
+
+    /** Values from the table 'badge_certificate' */
+    public $name;
+    public $description;
+    public $certbgimage;
+    public $official;
+    public $timecreated;
+    public $timemodified;
+    public $usercreated;
+    public $usermodified;
+    public $issuername;
+    public $issuercontact;
+    public $format;
+    public $orientation;
+    public $unit;
+    public $type;
+    public $courseid;
+    public $status = 0;
+    public $nextcron;
+
+    /** @var array Badge certificate elements */
+    public $elements = array();
+
+    /**
+     * Constructs with badge certificate details.
+     *
+     * @param int $certid badge certificate ID.
+     */
+    public function __construct($certid) {
+        global $DB;
+        $this->id = $certid;
+
+        $data = $DB->get_record('badge_certificate', array('id' => $certid));
+
+        if (empty($data)) {
+            print_error('error:nosuchbadgecertificate', 'badges', $certid);
+        }
+
+        foreach ((array)$data as $field => $value) {
+            if (property_exists($this, $field)) {
+                $this->{$field} = $value;
+            }
+        }
+
+        $this->elements = self::get_elements();
+    }
+
+    /**
+     * Use to get context instance of a badge certificate.
+     * @return context instance.
+     */
+    public function get_context() {
+        if ($this->type == CERT_TYPE_SITE) {
+            return context_system::instance();
+        } else if ($this->type == CERT_TYPE_COURSE) {
+            return context_course::instance($this->courseid);
+        } else {
+            debugging('Something is wrong...');
+        }
+    }
+
+    /**
+     * Save/update badge certificate information in 'badge_certificate'
+     * table only. Cannot be used for updating badge certificate elements.
+     *
+     * @return bool Returns true on success.
+     */
+    public function save() {
+        global $DB;
+
+        $fordb = new stdClass();
+        foreach (get_object_vars($this) as $k => $v) {
+            $fordb->{$k} = $v;
+        }
+        unset($fordb->elements);
+
+        $fordb->timemodified = time();
+        if ($DB->update_record_raw('badge_certificate', $fordb)) {
+            return true;
+        } else {
+            throw new moodle_exception('error:save', 'badges');
+            return false;
+        }
+    }
+
+    /**
+     * Checks if badge certificate is active.
+     * Used in badge certificate.
+     *
+     * @return bool A status indicating badge certificate is active
+     */
+    public function is_active() {
+        if (($this->status == CERT_STATUS_ACTIVE) ||
+            ($this->status == CERT_STATUS_ACTIVE_LOCKED)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Use to get the name of badge certificate status.
+     *
+     */
+    public function get_status_name() {
+        return get_string('badgecertificatestatus_' . $this->status, 'badges');
+    }
+
+    /**
+     * Use to set badge certificate status.
+     * Only active badge certificates can be used.
+     *
+     * @param int $status Status from CERT_STATUS constants
+     */
+    public function set_status($status = 0) {
+        $this->status = $status;
+        $this->save();
+    }
+
+    /**
+     * Checks if badge certificate is locked.
+     * Used in badge certificate editing.
+     *
+     * @return bool A status indicating badge certificate is locked
+     */
+    public function is_locked() {
+        if (($this->status == CERT_STATUS_ACTIVE_LOCKED) ||
+                ($this->status == CERT_STATUS_INACTIVE_LOCKED)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks if badge certificate has elements set up.
+     *
+     * @return bool A status indicating badge certificate has at least one element
+     */
+    public function has_elements() {
+        if (count($this->elements) > 0) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns badge certificate elements
+     *
+     * @return array An array of badge certificate elements
+     */
+    public function get_elements() {
+        global $DB;
+        $elements = array();
+
+        return (array)$DB->get_records('badge_certificate_elms', array('certid' => $this->id));
+    }
+
+    /**
+     * Fully deletes the badge certificate.
+     */
+    public function delete() {
+        global $DB;
+
+        $fs = get_file_storage();
+
+        // Remove all badge certificate elements.
+        $elements = $this->get_elements();
+        foreach ($elements as $element) {
+            $element->delete();
+        }
+
+        // Delete badge certificate images.
+        $certcontext = $this->get_context();
+        $fs->delete_area_files($certcontext->id, 'certificates', 'certbgimage', $this->id);
+
+        // Finally, remove badge certificate itself.
+        $DB->delete_records('badge_certificate', array('id' => $this->id));
+    }
+
+    /**
+     * Generates badge certificate preview in PDF format.
+     */
+    public function preview_badge_certificate() {
+        global $CFG, $DB;
+        require_once(dirname(dirname(__FILE__)) . '/lib' . '/tcpdf/tcpdf.php');
+
+        $pdf = new TCPDF($this->orientation, $this->unit, $this->format, true, 'UTF-8', false);
+        $pdf->SetCreator(PDF_CREATOR);
+        // remove default header/footer
+        $pdf->setPrintHeader(false);
+        $pdf->setPrintFooter(false);
+        // set default monospaced font
+        $pdf->SetDefaultMonospacedFont(PDF_FONT_MONOSPACED);
+        // set margins
+        $pdf->SetMargins(PDF_MARGIN_LEFT, PDF_MARGIN_TOP, PDF_MARGIN_RIGHT);
+        // set auto page breaks
+        $pdf->SetAutoPageBreak(TRUE, PDF_MARGIN_BOTTOM);
+        // set image scale factor
+        $pdf->setImageScale(PDF_IMAGE_SCALE_RATIO);
+        // set default font subsetting mode
+        $pdf->setFontSubsetting(true);
+
+        // Add a page
+        // This method has several options, check the source code documentation for more information.
+        $pdf->AddPage();
+
+        // Add badge certificate background image
+        if ($this->certbgimage) {
+            // get the current page break margin
+            $break_margin = $pdf->getBreakMargin();
+            // get current auto-page-break mode
+            $auto_page_break = $pdf->getAutoPageBreak();
+            // disable auto-page-break
+            $pdf->SetAutoPageBreak(false, 0);
+            // set background image
+            switch (pathinfo($this->certbgimage, PATHINFO_EXTENSION)) {
+                case 'png':
+                    $type = 'PNG';
+                    break;
+                case 'jpg':
+                case 'jpeg':
+                    $type = 'JPEG';
+                    break;
+                default:
+                    $type = '';
+            }
+            $pdf->Image($this->certbgimage, 0, 0, 0, 0, $type, '', '', 2, 200, '', false, false, 0);
+            // restore auto-page-break status
+            $pdf->SetAutoPageBreak($auto_page_break, $break_margin);
+            // set the starting point for the page content
+            $pdf->setPageMark();
+        }
+
+        // Print text/content using writeHTMLCell()
+        $now = time();
+        foreach ($this->elements as $element) {
+            $placeholders = array(
+                '[[recipient-flname]]', // Adds the recipient's full name (first, last)
+                '[[recipient-lfname]]', // Adds the recipient's full name (last, first)
+                '[[recipient-email]]',  // Adds the recipient's email address
+                '[[issuer-name]]',      // Adds the issuer's name or title
+                '[[issuer-contact]]',   // Adds the issuer's contact information
+                '[[badge-name]]',       // Adds the badge's name or title
+                '[[badge-desc]]',       // Adds the badge's description
+                '[[badge-number]]',     // Adds the badge's ID number
+                '[[badge-course]]',     // Adds the name of the course where badge was awarded
+                '[[badge-hash]]',       // Adds the badge hash value
+                '[[datetime-Y]]',       // Adds the year
+                '[[datetime-d.m.Y]]',   // Adds the date in dd.mm.yyyy format
+                '[[datetime-d/m/Y]]',   // Adds the date in dd/mm/yyyy format
+                '[[datetime-F]]',       // Adds the date (used in DB datestamps)
+                '[[datetime-s]]',       // Adds Unix Epoch Time timestamp';
+            );
+            $values = array(
+                get_string('preview:recipientflname', 'badges'),
+                get_string('preview:recipientlfname', 'badges'),
+                get_string('preview:recipientemail', 'badges'),
+                get_string('preview:issuername', 'badges'),
+                get_string('preview:issuercontact', 'badges'),
+                get_string('preview:badgename', 'badges'),
+                get_string('preview:badgedesc', 'badges'),
+                $this->id,
+                get_string('preview:badgecourse', 'badges'),
+                sha1(rand() . $this->usercreated . $this->id . $now),
+                strftime('%Y', $now),
+                strftime('%d. %m. %Y', $now),
+                strftime('%d/%m/%Y', $now),
+                strftime('%F', $now),
+                strftime('%s', $now),
+            );
+            $content = str_replace($placeholders, $values, $element->rawtext);
+            $pdf->setXY(0,0);
+            $pdf->SetFont($element->family, '', $element->size, '', true); // freesans or freeserif
+            if (in_array($element->align, array('T', 'B', 'I'))) {
+                switch ($element->align) {
+                    case 'T':
+                        $angle = 270;
+                        break;
+                    case 'B':
+                        $angle = 90;
+                        break;
+                    case 'I':
+                        $angle = 180;
+                        break;
+                    default:
+                        $angle = 0;
+                }
+                $pdf->StartTransform();
+                $pdf->Rotate($angle, $element->x, $element->y);
+                $pdf->writeHTMLCell(0, 0, $element->x, $element->y, $content, 0, 1, 0, true, $element->align, true);
+                $pdf->StopTransform();
+            } else {
+                $pdf->writeHTMLCell(0, 0, $element->x, $element->y, $content, 0, 1, 0, true, $element->align, true);
+            }
+        }
+
+        // Close and output PDF document
+        // This method has several options, check the source code documentation for more information.
+        $pdf->Output('preview_' . $this->name . '.pdf', 'I');
+    }
+}
+
+/**
+ * Class that represents badge certificate element.
+ *
+ */
+class badge_cert_element {
+    /** @var int Element id */
+    public $id;
+
+    /** Values from the table 'badge_certificate_elms' */
+    public $certid;
+    public $certname; // this is certificate name
+    public $certtype; // this is certificate type
+    public $courseid; // to which course this certificate element (certificate) belongs
+    public $x = 0;
+    public $y = 0;
+    public $size = 12;
+    public $family = 'freesans';
+    public $rawtext;
+    public $align = '';
+
+    /**
+     * Constructs with badge certificate element details.
+     *
+     * @param int $certid badge certificate element ID.
+     */
+    public function __construct($elementid) {
+        global $DB;
+        $this->id = $elementid;
+
+        $data = $DB->get_record_sql("SELECT e.id, e.certid, c.name, c.type, c.courseid, e.x, e.y, e.rawtext,
+                                            e.size, e.family, e.align, c.name AS certname, c.type AS certtype
+                    FROM {badge_certificate} c LEFT JOIN {badge_certificate_elms} e ON e.certid = c.id
+                    WHERE e.id = :elementid", array('elementid' => $elementid));
+
+        if (empty($data)) {
+            print_error('error:nosuchbadgecertelement', 'badges', $elementid);
+        }
+
+        foreach ((array)$data as $field => $value) {
+            if (property_exists($this, $field)) {
+                $this->{$field} = $value;
+            }
+        }
+    }
+
+    /**
+     * Use to get context instance of a badge certificate element.
+     * @return context instance.
+     */
+    public function get_context() {
+        $cert = new badge_certificate($this->certid);
+        if ($cert->type == CERT_TYPE_SITE) {
+            return context_system::instance();
+        } else if ($cert->type == CERT_TYPE_COURSE) {
+            return context_course::instance($cert->courseid);
+        } else {
+            debugging('Something is wrong...');
+        }
+    }
+
+    /**
+     * Save/update badge certificate element information in
+     * 'badge_certificate_elms' table only.
+     *
+     * @return bool Returns true on success.
+     */
+    public function save() {
+        global $DB;
+
+        $fordb = new stdClass();
+        foreach (get_object_vars($this) as $k => $v) {
+            $fordb->{$k} = $v;
+        }
+        unset($fordb->certname);
+        unset($fordb->certtype);
+        unset($fordb->courseid);
+
+        if ($DB->update_record_raw('badge_certificate_elms', $fordb)) {
+            return true;
+        } else {
+            throw new moodle_exception('error:save', 'badges');
+            return false;
+        }
+    }
+
+    /**
+     * Fully deletes the badge certificate element.
+     */
+    public function delete() {
+        global $DB;
+
+        $DB->delete_records('badge_certificate_elms', array('id' => $this->id));
+    }
+
+    /**
+     * Checks if badge certificate is active.
+     * Used in badge certificate.
+     *
+     * @return bool A status indicating badge certificate is active
+     */
+    public function is_active() {
+        global $DB;
+        $status = $DB->get_field('badge_certificate', 'status', array('id' => $this->certid));
+        if (($status == CERT_STATUS_ACTIVE) ||
+            ($status == CERT_STATUS_ACTIVE_LOCKED)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Checks if badge certificate is locked.
+     * Used in badge certificate editing.
+     *
+     * @return bool A status indicating badge certificate is locked
+     */
+    public function is_locked() {
+        global $DB;
+        $status = $DB->get_field('badge_certificate', 'status', array('id' => $this->certid));
+        if (($status == CERT_STATUS_ACTIVE_LOCKED) ||
+                ($status == CERT_STATUS_INACTIVE_LOCKED)) {
+            return true;
+        }
+        return false;
+    }
+
+}
+
 /**
  * Sends notifications to users about awarded badges.
  *
  * @param badge $badge Badge that was issued
  * @param int $userid Recipient ID
  * @param string $issued Unique hash of an issued badge
- * @param string $filepathhash File path hash of an issued badge for attachments
+ * @param string $filepathhash File pa+th hash of an issued badge for attachments
  */
 function badges_notify_badge_award(badge $badge, $userid, $issued, $filepathhash) {
     global $CFG, $DB;
@@ -831,6 +1312,80 @@ function badges_get_badges($type, $courseid = 0, $sort = '', $dir = '', $page = 
 }
 
 /**
+ * Get all badge certificates.
+ *
+ * @param int Type of badges to return
+ * @param int Course ID for course badges
+ * @param string $sort An SQL field to sort by
+ * @param string $dir The sort direction ASC|DESC
+ * @param int $page The page or records to return
+ * @param int $perpage The number of records to return per page
+ * @param int $user User specific search
+ * @return array $badge Array of records matching criteria
+ */
+function badges_get_certificates($type, $courseid = 0, $sort = '', $dir = '', $page = 0, $perpage = CERT_PERPAGE, $user = 0) {
+    global $DB;
+    $records = array();
+    $params = array();
+    $where = "bc.type = :type AND bc.usercreated = :user";
+    $params['type'] = $type;
+    $params['user'] = $user;
+
+    $userfields = array('bc.id, bc.name, bc.status');
+    $usersql = "";
+    $fields = implode(', ', $userfields);
+
+    if ($courseid != 0 ) {
+        $where .= "AND bc.courseid = :courseid ";
+        $params['courseid'] = $courseid;
+    }
+
+    $sorting = (($sort != '' && $dir != '') ? 'ORDER BY ' . $sort . ' ' . $dir : '');
+
+    $sql = "SELECT $fields FROM {badge_certificate} bc $usersql WHERE $where $sorting";
+    $records = $DB->get_records_sql($sql, $params, $page * $perpage, $perpage);
+
+    $certs = array();
+    foreach ($records as $r) {
+        $cert = new badge_certificate($r->id);
+        $certs[$r->id] = $cert;
+        $certs[$r->id]->statstring = $cert->get_status_name();
+    }
+    return $certs;
+}
+
+/**
+ * Get all element of a badge certificate.
+ *
+ * @param int Type of badges to return
+ * @param int Course ID for course badges
+ * @param string $sort An SQL field to sort by
+ * @param string $dir The sort direction ASC|DESC
+ * @param int $page The page or records to return
+ * @param int $perpage The number of records to return per page
+ * @param int $user User specific search
+ * @return array $badge Array of records matching criteria
+ */
+function badges_get_certelements($certid = 0, $sort = '', $dir = '', $page = 0, $perpage = CERT_PERPAGE) {
+    global $DB;
+    $records = array();
+    $params = array();
+    $where = ' e.certid = :certid ';
+    $params['certid'] = $certid;
+
+    $userfields = array('e.id, e.certid, e.rawtext, e.x, e.y, e.size, e.family');
+    $usersql = '';
+    $fields = implode(', ', $userfields);
+
+    $sorting = (($sort != '' && $dir != '') ? 'ORDER BY ' . $sort . ' ' . $dir : 'ORDER BY e.y ASC, e.x ASC ');
+
+    $sql = "SELECT $fields FROM {badge_certificate_elms} e $usersql WHERE $where $sorting";
+    $records = $DB->get_records_sql($sql, $params, $page * $perpage, $perpage);
+
+    return $records;
+}
+
+/**
  * Get badges for a specific user.
  *
  * @param int $userid User ID
@@ -913,6 +1468,13 @@ function badges_add_course_navigation(navigation_node $coursenode, stdClass $cou
 
             $coursenode->get('coursebadges')->add(get_string('newbadge', 'badges'), $url,
                     navigation_node::TYPE_SETTING, null, 'newbadge');
+        }
+
+        if (has_capability('moodle/badges:createbadge', $coursecontext)) {
+            $url = new moodle_url('/badges/certificates/index.php', array('type' => BADGE_TYPE_COURSE, 'id' => $course->id));
+
+            $coursenode->get('coursebadges')->add(get_string('managebadgecertificates', 'badges'), $url,
+                    navigation_node::TYPE_SETTING, null, 'badgecertificates');
         }
     }
 }
@@ -1262,4 +1824,40 @@ function badges_setup_backpack_js() {
         $PAGE->requires->js(new moodle_url($protocol . BADGE_BACKPACKURL . '/issuer.js'), true);
         $PAGE->requires->js('/badges/backpack.js', true);
     }
+}
+
+/**
+ * Returns array of available badge certificates depending on
+ * user capabilities and possible course that badge is part of.
+ *
+ * @param int $courseid course ID
+ * @return string Code of backpack accessibility status.
+ */
+function get_available_certificates($courseid) {
+    global $DB;
+    $records = array();
+    $params = array();
+    $where = ' c.courseid = :courseid AND (c.status = 1 OR c.status = 3) ';
+    $params['courseid'] = $courseid;
+    if (has_capability('moodle/badges:assignofficialcertificate', context_system::instance())) {
+        $where .= ' AND c.official >= 0 ';
+    } else {
+        $where .= ' AND c.official = 0 ';
+    }
+
+    $userfields = array('c.id, c.name');
+    $usersql = '';
+    $fields = implode(', ', $userfields);
+
+    $sorting = 'ORDER BY c.name ASC ';
+
+    $sql = "SELECT $fields FROM {badge_certificate} c $usersql WHERE $where $sorting";
+    $records = $DB->get_records_sql($sql, $params);
+
+    $options = array();
+    foreach ($records as $record) {
+        $options[$record->id] = $record->name;
+    }
+
+    return $options;
 }

@@ -3183,5 +3183,80 @@ function xmldb_main_upgrade($oldversion) {
         upgrade_main_savepoint(true, 2014031400.04);
     }
 
+    if ($oldversion < 2014032000.06) {
+        // Add tables for certificates based on openbadges.
+
+        // Define table 'badge_certificate' to be created.
+        $table = new xmldb_table('badge_certificate');
+
+        // Adding fields to table 'badge_certificate'.
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null, null);
+        $table->add_field('name', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null, 'id');
+        $table->add_field('official', XMLDB_TYPE_INTEGER, '1', null, null, null, '0', 'name');
+        $table->add_field('description', XMLDB_TYPE_TEXT, null, null, null, null, null, 'official');
+        $table->add_field('certbgimage', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'description');
+        $table->add_field('timecreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'bgimage');
+        $table->add_field('timemodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'timecreated');
+        $table->add_field('usercreated', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null, 'timemodified');
+        $table->add_field('usermodified', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null, 'usercreated');
+        $table->add_field('issuername', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, null, 'usermodified');
+        $table->add_field('issuercontact', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'issuername');
+        $table->add_field('format', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, 'A4', 'issuercontact');
+        $table->add_field('orientation', XMLDB_TYPE_CHAR, '1', null, XMLDB_NOTNULL, null, 'P', 'format');
+        $table->add_field('unit', XMLDB_TYPE_CHAR, '2', null, XMLDB_NOTNULL, null, 'mm', 'orientation');
+        $table->add_field('type', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '1', 'unit');
+        $table->add_field('courseid', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'type');
+        $table->add_field('status', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'courseid');
+        $table->add_field('nextcron', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'status');
+
+        // Adding keys to table 'badge_certificate'.
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $table->add_key('fk_courseid', XMLDB_KEY_FOREIGN, array('courseid'), 'course', array('id'));
+        $table->add_key('fk_usermodified', XMLDB_KEY_FOREIGN, array('usermodified'), 'user', array('id'));
+        $table->add_key('fk_usercreated', XMLDB_KEY_FOREIGN, array('usercreated'), 'user', array('id'));
+
+        // Adding indexes to table 'badge_certificate'.
+        $table->add_index('type', XMLDB_INDEX_NOTUNIQUE, array('type'));
+
+        // Conditionally launch create table for 'badge_certificate'.
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Define table 'badge_certificate_elms' to be created.
+        $table = new xmldb_table('badge_certificate_elms');
+
+        // Adding fields to table 'badge_certificate_elms'.
+        $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null, null);
+        $table->add_field('certid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null, 'id');
+        $table->add_field('x', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0', 'certid');
+        $table->add_field('y', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0', 'x');
+        $table->add_field('size', XMLDB_TYPE_INTEGER, '3', null, XMLDB_NOTNULL, null, '12', 'y');
+        $table->add_field('family', XMLDB_TYPE_CHAR, '30', null, XMLDB_NOTNULL, null, null, 'size');
+        $table->add_field('rawtext', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null, 'family');
+        $table->add_field('align', XMLDB_TYPE_CHAR, '10', null, null, null, null, 'rawtext');
+
+        // Adding keys to table 'badge_certificate_elms'.
+        $table->add_key('primary', XMLDB_KEY_PRIMARY, array('id'));
+        $table->add_key('fk_certid', XMLDB_KEY_FOREIGN, array('certid'), 'badge_certificate', array('id'));
+
+        // Conditionally launch create table for 'badge_certificate_elms'.
+        if (!$dbman->table_exists($table)) {
+            $dbman->create_table($table);
+        }
+
+        // Define field variant to be added to badge.
+        $table = new xmldb_table('badge');
+        $field = new xmldb_field('certid', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'courseid');
+
+        // Conditionally launch add field variant.
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        // Main savepoint reached.
+        upgrade_main_savepoint(true, 2014032000.06);
+    }
+
     return true;
 }

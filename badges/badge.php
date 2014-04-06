@@ -29,6 +29,7 @@ require_once($CFG->libdir . '/badgeslib.php');
 
 $id = required_param('hash', PARAM_ALPHANUM);
 $bake = optional_param('bake', 0, PARAM_BOOL);
+$cert = optional_param('cert', 0, PARAM_BOOL);
 
 $PAGE->set_context(context_system::instance());
 $output = $PAGE->get_renderer('core', 'badges');
@@ -43,6 +44,10 @@ if ($bake && ($badge->recipient->id == $USER->id)) {
     header('Content-Disposition: attachment; filename="'. $name .'"');
     readfile($file);
     ob_flush();
+}
+
+if ($cert && ($badge->recipient->id == $USER->id)) {
+    $badge->generate_badge_certificate();
 }
 
 $PAGE->set_url('/badges/badge.php', array('hash' => $id));

@@ -89,6 +89,7 @@ if ($form->is_cancelled()) {
     $fordb->expireperiod = ($data->expiry == 2) ? $data->expireperiod : null;
     $fordb->type = $type;
     $fordb->courseid = ($type == BADGE_TYPE_COURSE) ? $courseid : null;
+    $fordb->certid = $data->certid;
     $fordb->messagesubject = get_string('messagesubject', 'badges');
     $fordb->message = get_string('messagebody', 'badges',
             html_writer::link($CFG->wwwroot . '/badges/mybadges.php', get_string('mybadges', 'badges')));
